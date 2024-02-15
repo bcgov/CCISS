@@ -1,0 +1,208 @@
+---
+title: "Random Forest Model of Biogeoclimatic Units for Western North America"
+author: "William H MacKenzie & Kiri Daust"
+date: "22/03/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+Require::Require(c(
+  "bcgov/climr@main", 
+  "caret", 
+  "clhs", 
+  "data.table", 
+  "foreach", 
+  "ggplot2", 
+  "Microsoft365R",
+  "randtoolbox", 
+  "ranger", 
+  "reproducible",
+  "sf", 
+  "smotefamily", 
+  "terra", 
+  "themis",
+  "tidymodels"
+))
+
+options(reproducible.cachePath = "reproducible.cache/",
+        climr.cache.path = "climr.cache/")
+
+source("R/utils.R")
+
+## not working. Destany will sen email to admin
+# odb <- get_business_onedrive()
+# od$download_file("Documents/myfile.docx")
+
+```
+
+# General process
+Build a grid of points for WNA and attribute with data from ClimateBC for BC and ClimateNA for rest. A 2km grid seems to provide enough training points for most BGCs. Large non-vegetation land areas are excluded (lakes and glaciers primarily)
+There are areas where BGC mapping represents local effects represented by small polygons and these are removed (2km2) or are coast transition areas that are poorly mapped and climte modelled (inland polygons of CWH)
+We tested various variable sets - more work could be done here. First only include variables where an ecologically important control could be defined. Variables are removed that are highly correlated in both space and time. Preliminary runs in the modern climate change period (1991-2019) were assessed. Some additional variables that  were removed at this point as the priority effect could not be controlled. Specifically winter temperatures, which strongly differentiate between BGCs in historic models also rise most markedly through time. As there is no way to prioritize growing season variables, the increase in winter temperatures in the modern period then predict vast changes in the SBS which seem unwarranted. Threshold controls of winter temperatures might be more relevant.
+Univariate outliers (IQR *1.5) within each BGC are flagged and  training points with any outliers are removed.
+All variables are centered and scaled to harmonize the data dispersion which can effect selection in the model.
+To 
+
+
+Points from a 4km hex grid of western north america are generated in R and submitted to ClimateNA to extract annual and seasonal variables for the historic normal period (1961-90) and an ensemble future climate scenario (rcp45 2040-2070). These data sets are combined. Several additional climate variables are generated including several monthly climate sums for precipitation and growing degree days. All other monthly variables are removed. A winter rechange moisture deficit was calculated and summed with the climatic moisture deficit to account for regions that begin the growing season in soil moisture deficit.
+
+
+```{r}
+bgcs <- st_read("//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg")
+elev <- rast("//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif")
+
+coords <- makePointCoords(bgcs, elev) |>
+  Cache()
+coords <- coords[!is.na(elev),]
+
+## full training area
+trainingarea <- ext(c(-125, -112, 43, 55))
+coords_train <- subsetByExtent(coords, trainingarea)
+
+## make subsets of the study area for hold-outs (gaps)
+studyarea <- ext(c(-123, -117, 49, 52.5))
+gapextents <- makeGapExtents(studyarea, 5L)
+## convert to poly
+gap_poly <- lapply(gapextents, vect, crs = "EPSG:4326")
+gap_poly <- do.call(rbind, gap_poly)
+
+coords_gaps <- subsetByExtent(coords_train, gap_poly)
+coords_trainWgaps <- coords_train[!coords_gaps, on = "id"]
+```
+
+```{r}
+vars_needed <- c("DD5", "DD_0_at", "DD_0_wt", "PPT05", "PPT06", "PPT07", "PPT08",
+                 "PPT09", "CMD", "PPT_at", "PPT_wt", "CMD07", "SHM", "AHM", "NFFD", "PAS", "CMI")
+
+clim_vars <- getClimate(coords_train, bgcs,
+                        which_normal = "normal_composite", return_normal = TRUE, 
+                        vars = vars_needed, cache = TRUE) |>
+  Cache()
+
+## subset coords objects to ids with data
+coords_train <- coords_train[clim_vars[, .(id)], on = "id", nomatch = 0L]
+coords_trainWgaps <- coords_trainWgaps[clim_vars[, .(id)], on = "id", nomatch = 0L]
+```
+
+```{r reduce variables}
+setDT(clim_vars)   ## this shouldn't be necessary, submit issue/reprex to reproducible.
+addVars(clim_vars)
+
+vs_final <- c("DD5", "DD_delayed", "PPT_MJ", "PPT_JAS", 
+              "CMD.total", "CMI", "CMDMax", "SHM", "AHM", "NFFD", "PAS")
+
+trainData <- clim_vars[, .SD, .SDcols = c("BGC", "id", vs_final)]
+trainData <- trainData[complete.cases(trainData)]
+
+# BGC_counts <- trainData[, .(Num = .N), by = .(BGC)]   ## for inspection
+```
+
+```{r remove poor BGCs}
+badbgcs <- c("BWBSvk", "ICHmc1a", "MHun", "SBSun", "ESSFun", "SWBvk","MSdm3","ESSFdc3", "IDFdxx_WY", "MSabS", "FGff", "JPWmk_WY" )#, "ESSFab""CWHws2", "CWHwm", "CWHms1" , 
+trainData <- trainData[!BGC %in% badbgcs,]
+```
+
+The new rebalanced training set is 310 668 points. This training set is submitted to ranger to generate a final climate model of BGCs for western north america.
+
+```{r final training sets}
+## set alpha for removal of outliers (2.5% = 3SD)
+trainData <- removeOutlier(as.data.frame(trainData), alpha = .025, vars = vs_final) |>
+  Cache()
+```
+
+```{r remove very small units}
+trainData <- rmLowSampleBGCs(trainData) |>
+  Cache()
+```
+
+```{r balance}
+dataBalance_recipe <- recipe(BGC ~ ., data =  trainData) |>
+  step_downsample(BGC, under_ratio = 90) |>  ## subsamples "oversampled" BGCs
+  prep()
+
+## extract data.table
+trainData_balanced <- dataBalance_recipe |>
+  juice() |>
+  as.data.table()
+
+# BGC_Nums <- trainData_balanced[,.(Num = .N), by = BGC]   ## for inspection
+```
+
+```{r train model}
+trainData_balanced[, BGC := as.factor(BGC)]
+
+cols <- c("BGC", vs_final)
+BGCmodel_full <- ranger(
+  BGC ~ .,
+  data = trainData_balanced[, ..cols],
+  num.trees = 501,
+  splitrule =  "extratrees",
+  mtry = 4,
+  min.node.size = 2,
+  importance = "permutation",
+  write.forest = TRUE,
+  classification = TRUE,
+  probability = FALSE
+) |>
+  Cache()
+
+
+subTrainData_balanced <- trainData_balanced[coords_trainWgaps, on = "id", nomatch = 0L]
+
+## retrain without hold-out sample gaps
+cols <- c("BGC", vs_final)
+BGCmodel_holdoutAll <- ranger(
+  BGC ~ .,
+  data = subTrainData_balanced[, ..cols],
+  num.trees = 501,
+  splitrule =  "extratrees",
+  mtry = 4,
+  min.node.size = 2,
+  importance = "permutation",
+  write.forest = TRUE,
+  classification = TRUE,
+  probability = FALSE
+) |>
+  Cache()
+
+saveRDS(BGCmodel_full, "//objectstore2.nrs.bcgov/ffec/CCISS_Working/BGCmodel_full.rds")
+saveRDS(BGCmodel_holdoutAll, "//objectstore2.nrs.bcgov/ffec/CCISS_Working/BGCmodel_holdoutAll.rds")
+
+## study area for testing - get points at DEM scale 
+crs.bc <- crs(rast("//objectstore2.nrs.bcgov/ffec/Climatologies/PRISM_BC/PRISM_dem/PRISM_dem.asc"), proj = TRUE)
+
+## replace the followig with postProcess
+elevproj <- project(elev, crs.bc) |>
+  Cache()
+elevproj <- crop(elevproj, studyarea)
+
+elevproj2 <- postProcess(elev, 
+                         cropTo = vect(studyarea),
+                         projectTo = crs.bc) |>
+  Cache()
+
+studyarea_points <- as.data.frame(elevproj, cells = TRUE, xy = TRUE)
+colnames(studyarea_points) <- c("id", "x", "y", "el")
+studyarea_points <- studyarea_points[, c("x", "y", "el", "id")] #restructure for climr input
+
+predData <- climr_downscale(studyarea_points, 
+                            which_normal = "normal_composite",
+                            return_normal = TRUE, 
+                            vars = vars_needed, cache = TRUE)
+addVars(predData)
+predData <- predData[complete.cases(predData)]
+
+predDT <- predData[, list(id = ID,
+                          full = as.character(predict(BGCmodel_full, 
+                                                      data = predData)$predictions),
+                          holdoutAll = as.character(predict(BGCmodel_holdoutAll, 
+                                                       data = predData)$predictions))]
+saveRDS(predDT, "//objectstore2.nrs.bcgov/ffec/CCISS_Working/predictions_full_holdouts.rds")
+
+confusionMatrix(data = predictions(BGCmodel),
+                reference = trainData$BGC)
+
+```
