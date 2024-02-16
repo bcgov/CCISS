@@ -3,4 +3,9 @@
 .RData
 .Ruserdata
 
+## cache folders
 reproducible.cache/
+climr.cache/
+
+## project R package library
+packages/
