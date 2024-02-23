@@ -108,6 +108,10 @@ if (fit == "fulldata") {
   coords_train_balanced <- st_as_sf(coords_train_balanced, coords = c("x", "y"))
   st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
   
+  folds <- 10
+  future::plan("multisession", 
+               workers = ifelse(folds <= future::availableCores(), folds, future::availableCores()))
+  
   ## make a modelling task
   tsk_bgc <- as_task_classif_st(coords_train_balanced, target = "BGC", )
   
@@ -125,8 +129,10 @@ if (fit == "fulldata") {
   measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
     
   ## train model with CV
-  RF_cv <- mlr3::resample(tsk_bgc, lrn_rf, cv_strategy, store_models = TRUE) #|>
-    # Cache()  ## caching seems to lead to loss of model object
+  RF_cv <- mlr3::resample(tsk_bgc, lrn_rf, cv_strategy, store_models = TRUE) |>
+    Cache()
+  future:::ClusterRegistry("stop")
+  
   RF_cv$score(measure_acc)  ## eval of each fold
   RF_cv$aggregate(measure_acc)  ## aggregated scores
   RF_cv$aggregate(msrs(c("classif.acc", "classif.ce"), average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then computes the measure on this directly:
