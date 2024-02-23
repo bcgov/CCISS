@@ -135,7 +135,10 @@ if (fit == "fulldata") {
   
   RF_cv$score(measure_acc)  ## eval of each fold
   RF_cv$aggregate(measure_acc)  ## aggregated scores
-  RF_cv$aggregate(msrs(c("classif.acc", "classif.ce"), average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then computes the measure on this directly:
+  RF_cv$aggregate(msrs(c("classif.acc", "classif.ce", "oob_error"),
+                       average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then computes the measure on this directly
+  
+  ## lower oob error that RF above 21.21%)
   
   trainData_balanced2 <- trainData_balanced[coords_trainWgaps, on = "id", nomatch = 0L]
 }
