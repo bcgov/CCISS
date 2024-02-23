@@ -26,6 +26,10 @@ Require::Require(c(
   "tidymodels"
 ))
 
+## install, but don't load these.
+Require::Require(c(
+  "future"), 
+  require = FALSE)
 
 options(reproducible.cachePath = normalizePath("reproducible.cache/", winslash = "/"),
         reproducible.destinationPath = normalizePath("data/", winslash = "/"),
