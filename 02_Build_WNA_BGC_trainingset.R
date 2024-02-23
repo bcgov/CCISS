@@ -104,6 +104,9 @@ if (fit == "fulldata") {
   
   
 } else {
+  # trainData_balanced2 <- trainData_balanced[coords_trainWgaps, on = "id", nomatch = 0L]   ## better to evaluate with CV (below)
+  
+  
   coords_train_balanced <- coords_train[trainData_balanced, on = "id"]
   coords_train_balanced <- st_as_sf(coords_train_balanced, coords = c("x", "y"))
   st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
@@ -140,7 +143,6 @@ if (fit == "fulldata") {
   
   ## lower oob error that RF above 21.21%)
   
-  trainData_balanced2 <- trainData_balanced[coords_trainWgaps, on = "id", nomatch = 0L]
 }
 
 
