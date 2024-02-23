@@ -9,3 +9,6 @@ climr.cache/
 
 ## project R package library
 packages/
+
+## data
+data/
