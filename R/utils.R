@@ -160,8 +160,9 @@ getClimate <- function(coords, bgcs, crs = "EPSG:4326", ...) {
   coords_sf$elev <- NULL
   coords_sf <- st_transform(coords_sf, 3005)
   
-  coords_bgc <- st_join(coords_sf, bgcs)
-  coords_bgc <- data.table(coords_bgc[,c("id","BGC")])
+  coords_bgc <- st_join(coords_sf, bgcs) |>
+    Cache()
+  coords_bgc <- data.table(coords_bgc[,c("id", "BGC")])
   coords_bgc[, geometry := NULL]
   coords_bgc <- coords_bgc[!is.na(BGC),]
   
