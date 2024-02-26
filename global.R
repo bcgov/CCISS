@@ -26,6 +26,20 @@ Require::Require(c(
   "tidymodels"
 ))
 
+## for 03 but to simplify.
+require (smotefamily)
+library(foreign)
+library(RStoolbox)
+library(maptools)
+library(spatstat)
+require(scales)
+require(caret)
+require(gstat)
+require(purrr)
+require(forcats)
+require(StatMatch)
+require(lwgeom)
+
 ## install, but don't load these.
 Require::Require(c(
   "future"), 

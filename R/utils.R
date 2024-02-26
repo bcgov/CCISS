@@ -333,3 +333,12 @@ rmLowSampleBGCs <- function(dat, cutoff = 30) {
   BGC_good <- dat[!BGC %in% BGC_Nums[Num < cutoff, BGC],] 
   return(BGC_good)
 }
+
+
+vertDist <- function(x) {
+  (sideLen(x)*3)/2
+}
+
+sideLen <- function(x) {
+  x/sqrt(3)
+}
