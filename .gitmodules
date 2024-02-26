@@ -7,3 +7,6 @@
 [submodule "modules/BC_HexGrid"]
 	path = modules/BC_HexGrid
 	url = git@github.com:kdaust/BC_HexGrid.git
+[submodule "modules/CCISS_Reporter"]
+	path = modules/CCISS_Reporter
+	url = git@github.com:whmacken/CCISS_Reporter.git
