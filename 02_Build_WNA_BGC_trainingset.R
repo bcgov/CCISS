@@ -19,6 +19,7 @@ coords <- coords[!is.na(elev),]
 ## full training area
 trainingarea <- ext(c(-125, -112, 43, 55))
 coords_train <- subsetByExtent(coords, trainingarea)
+setnames(coords_train, c("lon", "lat", "elev", "id"))
 
 ## this is no longer necessary with automated spatial CV
 ## make subsets of the study area for hold-outs (gaps)

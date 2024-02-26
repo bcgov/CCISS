@@ -152,11 +152,11 @@ makeGapExtents <- function(studyarea = ext(c(-123, -118, 49, 52)), ngaps = 5L) {
 getClimate <- function(coords, bgcs, crs = "EPSG:4326", ...) {
   dots <- list(...)
   
-  if (any(!c("x", "y", "elev", "id") %in% names(coords))) {
-    stop("coords mmust contain columns 'x', 'y', 'elev' and 'id'")
+  if (any(!c("lon", "lat", "elev", "id") %in% names(coords))) {
+    stop("coords must contain columns 'lon', 'lat', 'elev' and 'id'")
   }
   
-  coords_sf <- st_as_sf(coords, coords = c("x","y"), crs = crs)
+  coords_sf <- st_as_sf(coords, coords = c("lon", "lat"), crs = crs)
   coords_sf$elev <- NULL
   coords_sf <- st_transform(coords_sf, 3005)
   
@@ -187,11 +187,9 @@ getClimate <- function(coords, bgcs, crs = "EPSG:4326", ...) {
     Cache()
   setDT(clim_vars)
   clim_vars <- clim_vars[!is.nan(PPT05),] ##lots of points in the ocean
-  clim_vars[coords_bgc, BGC := i.BGC, on = "ID==id"]
+  clim_vars[coords_bgc, BGC := i.BGC, on = "id"]
   clim_vars <- clim_vars[!is.na(BGC), ]
   clim_vars[, PERIOD := NULL]
-  clim_vars[, id := ID]
-  clim_vars[, ID := NULL]
   
   return(clim_vars)
 }
