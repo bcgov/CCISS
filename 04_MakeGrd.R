@@ -1,16 +1,6 @@
 ##read in provincial outline, tile, and output for climatebc
 ##Kiri Daust
 
-library(data.table)
-library(sf)
-library(foreach)
-library(tidyverse)
-library(raster)
-library(rmapshaper)
-library(sp)
-vertDist <- function(x){(sideLen(x)*3)/2}
-sideLen <- function(x){x/sqrt(3)}
-
 ##create siteno, bgc, dist_code table for preselected by BEC
 grd <- st_read("BC_HexPoints400m.gpkg")
 

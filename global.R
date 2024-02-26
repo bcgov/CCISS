@@ -21,6 +21,7 @@ Require::Require(c(
   "mlr3learners",
   "mlr3spatial", 
   "mlr3spatiotempcv",
+  "rmapshaper",
   "terra", 
   "themis",
   "tidymodels"
