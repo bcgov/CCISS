@@ -4,3 +4,6 @@
 [submodule "modules/Build_WNA_BGC_model"]
 	path = modules/Build_WNA_BGC_model
 	url = git@github.com:FLNRO-Smithers-Research/Build_WNA_BGC_model.git
+[submodule "modules/BC_HexGrid"]
+	path = modules/BC_HexGrid
+	url = git@github.com:kdaust/BC_HexGrid.git
