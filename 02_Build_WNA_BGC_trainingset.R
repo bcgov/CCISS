@@ -44,7 +44,6 @@ clim_vars <- getClimate(coords_train, bgcs,
 coords_train <- coords_train[clim_vars[, .(id)], on = "id", nomatch = 0L]
 # coords_trainWgaps <- coords_trainWgaps[clim_vars[, .(id)], on = "id", nomatch = 0L]
 
-
 setDT(clim_vars)   ## this shouldn't be necessary, submit issue/reprex to reproducible.
 addVars(clim_vars)
 
@@ -81,103 +80,53 @@ trainData_balanced <- dataBalance_recipe |>
 
 # trainData_balanced[,.(Num = .N), by = BGC]   ## for inspection
 
-
 trainData_balanced[, BGC := as.factor(BGC)]
 
 ## FIT MODEL WITH FULL DATA SET OR CROSS-VALIDATION
 cols <- c("BGC", vs_final)
-if (fit == "fulldata") {
-  trainData_balanced2 <- trainData_balanced[, ..cols]
-  
-  BGCmodel <- ranger(
-    BGC ~ .,
-    data = trainData_balanced2,
-    num.trees = 501,
-    splitrule =  "extratrees",
-    mtry = 4,
-    min.node.size = 2,
-    importance = "permutation",
-    write.forest = TRUE,
-    classification = TRUE,
-    probability = FALSE
-  ) |>
-    Cache()
-  
-  
-} else {
-  # trainData_balanced2 <- trainData_balanced[coords_trainWgaps, on = "id", nomatch = 0L]   ## better to evaluate with CV (below)
-  
-  
-  coords_train_balanced <- coords_train[trainData_balanced, on = "id"]
-  coords_train_balanced <- st_as_sf(coords_train_balanced, coords = c("x", "y"))
-  st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
-  
-  folds <- 10
-  future::plan("multisession", 
-               workers = ifelse(folds <= future::availableCores(), folds, future::availableCores()))
-  
-  ## make a modelling task
-  tsk_bgc <- as_task_classif_st(coords_train_balanced, target = "BGC", )
-  
-  ## define and apply cv strategy
-  cv_strategy <- rsmp("repeated_spcv_coords", folds = 10, repeats = 1)
-  
-  ## choose model type and eval metric
-  lrn_rf <- lrn("classif.ranger", predict_type = "response",
-                num.trees = 501,
-                splitrule =  "extratrees",
-                mtry = 4,
-                min.node.size = 2,
-                importance = "permutation",
-                write.forest = TRUE)
-  measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
-    
-  ## train model with CV
-  RF_cv <- mlr3::resample(tsk_bgc, lrn_rf, cv_strategy, store_models = TRUE) |>
-    Cache()
-  future:::ClusterRegistry("stop")
-  
-  RF_cv$score(measure_acc)  ## eval of each fold
-  RF_cv$aggregate(measure_acc)  ## aggregated scores
-  RF_cv$aggregate(msrs(c("classif.acc", "classif.ce", "oob_error"),
-                       average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then computes the measure on this directly
-  
-  ## lower oob error that RF above 21.21%)
-  
-}
 
+# trainData_balanced2 <- trainData_balanced[coords_trainWgaps, on = "id", nomatch = 0L]   ## better to evaluate with CV (below)
 
+coords_train_balanced <- coords_train[trainData_balanced, on = "id"]
+coords_train_balanced <- st_as_sf(coords_train_balanced, coords = c("lon", "lat"))
+st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
 
+## make a modelling task
+tsk_bgc <- as_task_classif_st(coords_train_balanced, target = "BGC")
 
-## study area for testing - get points at DEM scale 
-crs.bc <- crs(rast("//objectstore2.nrs.bcgov/ffec/Climatologies/PRISM_BC/PRISM_dem/PRISM_dem.asc"), proj = TRUE)
+## choose model type and eval metric
+lrn_rf <- lrn("classif.ranger", predict_type = "response",
+              num.trees = 501,
+              splitrule =  "extratrees",
+              mtry = 4,
+              min.node.size = 2,
+              importance = "permutation",
+              write.forest = TRUE)
+measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
 
-## replace the followig with postProcess
-elevproj <- project(elev, crs.bc) |>
+## fit full model --------------------------------------------
+lrn_rf$train(tsk_bgc)
+lrn_rf$model
+## this plot is useless, but code is kept here for fut reference
+# autoplot(lrn_rf$predict(tsk_bgc)) +
+#   theme(legend.position = "none")
+
+## evaluate model with CV ------------------------------------
+## define and apply cv strategy
+folds <- 10
+cv_strategy <- rsmp("repeated_spcv_coords", folds = folds, repeats = 1)
+
+future::plan("multisession", 
+             workers = ifelse(folds <= future::availableCores(), folds, future::availableCores()))
+
+RF_cv <- mlr3::resample(tsk_bgc, lrn_rf, cv_strategy, store_models = TRUE) |>
   Cache()
-elevproj <- crop(elevproj, studyarea)
+future:::ClusterRegistry("stop")
 
-elevproj2 <- postProcess(elev, 
-                         cropTo = vect(studyarea),
-                         projectTo = crs.bc) |>
-  Cache()
+RF_cv$score(measure_acc)  ## eval of each fold
+RF_cv$aggregate(measure_acc)  ## aggregated scores
+RF_cv$prediction()$score(msrs(c("classif.acc", "classif.ce"),
+                              average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then compute the measure on this directly
+## confusion matrix
+RF_cv$prediction()$confusion
 
-studyarea_points <- as.data.frame(elevproj, cells = TRUE, xy = TRUE)
-colnames(studyarea_points) <- c("id", "x", "y", "el")
-studyarea_points <- studyarea_points[, c("x", "y", "el", "id")] #restructure for climr input
-
-predData <- climr_downscale(studyarea_points, 
-                            which_normal = "normal_composite",
-                            return_normal = TRUE, 
-                            vars = vars_needed, cache = TRUE)
-addVars(predData)
-predData <- predData[complete.cases(predData)]
-
-predDT <- predData[, list(id = ID,
-                          full = as.character(predict(BGCmodel_full, 
-                                                      data = predData)$predictions),
-                          holdoutAll = as.character(predict(BGCmodel_holdoutAll, 
-                                                            data = predData)$predictions))]
-
-confusionMatrix(data = predictions(BGCmodel),
-                reference = trainData$BGC)
