@@ -7,7 +7,7 @@ invisible(Require::setLibPaths("packages/"))
 
 ## install/load packages
 Require::Require(c(
-  "bcgov/climr@devl", 
+  "bcgov/climr@devl (HEAD)", 
   "caret", 
   "clhs", 
   "data.table", 
