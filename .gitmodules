@@ -10,3 +10,6 @@
 [submodule "modules/CCISS_Reporter"]
 	path = modules/CCISS_Reporter
 	url = git@github.com:whmacken/CCISS_Reporter.git
+[submodule "modules/CCISS_Portfolio_Dataset_Alignment"]
+	path = modules/CCISS_Portfolio_Dataset_Alignment
+	url = git@github.com:whmacken/CCISS_Portfolio_Dataset_Alignment.git
