@@ -55,4 +55,4 @@ options(reproducible.cachePath = normalizePath("reproducible.cache/", winslash =
 source("R/utils.R")
 
 ## source scripts
-source("02_Build_WNA_BGC_trainingset.R")
+source("R/02_Build_WNA_BGC_trainingset.R")
