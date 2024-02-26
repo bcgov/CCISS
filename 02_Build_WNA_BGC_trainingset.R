@@ -118,7 +118,6 @@ cv_strategy <- rsmp("repeated_spcv_coords", folds = folds, repeats = 1)
 
 future::plan("multisession", 
              workers = ifelse(folds <= future::availableCores(), folds, future::availableCores()))
-
 RF_cv <- mlr3::resample(tsk_bgc, lrn_rf, cv_strategy, store_models = TRUE) |>
   Cache()
 future:::ClusterRegistry("stop")
