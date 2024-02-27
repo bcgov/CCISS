@@ -11,10 +11,8 @@ hexgrd <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Wo
 bgcs <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
                                  targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
                                  fun = "sf::st_read",
-                                 projectTo = st_crs(4326))
-
-bgcs <- st_zm(bgcs)
-bgcs <- st_cast(bgcs, "MULTIPOLYGON")
+                                 projectTo = st_crs(4326)) |> 
+  Cache()
 
 bgcs_hexgrd <- st_join(hexgrd, bgcs)
 
