@@ -1,10 +1,14 @@
 ## This script must be sourced
 
+## FIT AND EVALUATE A BGC MODEL
+
 ## TODO: need proper documentation and references to sources/scripts that produced these objects
 ## for now, download files manually from object storage and put them in:
 ## filepath(options(reproducible.destinationPath), "WNA_BGC_v12_5Apr2022.gpkg")
 ## filepath(options(reproducible.destinationPath), "northamerica/northamerica_elevation_cec_2023.tif")
 ## then select 'y' when asked if objects are in the right place.
+
+## TODO: MakeGrd. is getting bgcs
 bgcs <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
                                  targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
                                  fun = "sf::st_read")
