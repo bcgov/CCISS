@@ -7,30 +7,64 @@
 hexgrd <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/HexGrid400m_Sept2021.gpkg",
                                    targetFile = "HexGrid400m_Sept2021.gpkg",
                                    fun = "sf::st_read",
-                                   projectTo = st_crs(4326)) |>
-  Cache()
+                                   projectTo = st_crs(4326),
+                                   quick = TRUE) |>
+  Cache(userTags = "hexgrd", omitArgs = c("quick", "userTags"))
+hexgrd <- vect(hexgrd) |>
+  Cache(.cacheExtra = summary(hexgrd), 
+        userTags = "hexgrd_vect", 
+        omitArgs = c("x", "userTags"))
 
 bgcs <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
                                  targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
-                                 fun = "sf::st_read",
-                                 projectTo = st_crs(4326)) |> 
-  Cache()
+                                 fun = "terra::vect",
+                                 to = hexgrd, 
+                                 maskTo = NA,
+                                 quick = TRUE) |> 
+  Cache(userTags = "bgcs", omitArgs = c("quick", "userTags"))
 
-bgcs_hexgrd <- st_join(hexgrd, bgcs) |>
-  Cache()
-
-regions <- st_read("~/CommonTables/ForestRegions.gpkg","ForestDistricts2")
+## regions used for tiling
+regions <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CommonTables/Forest_Region_District.gpkg",
+                                    targetFile = "Forest_Region_District.gpkg",
+                                    fun = "terra::vect",
+                                    to = hexgrd, 
+                                    maskTo = NA,
+                                    quick = TRUE) |> 
+  Cache(userTags = "regions", omitArgs = c("quick", "userTags"))
 regions <- regions["ORG_UNIT"]
-bgcs_hexgrd <- st_join(bgcs_hexgrd, regions)
+
+for (i in 1:3) gc(reset = TRUE)  ## reset memory a few times
+
+## Note: maybe not necessary, we want bgcs for center points of each hex
+## TODO: double check with Kiri to see if he remembers why the join
+# bgcs_hexgrd <- st_join(hexgrd, bgcs) |>
+#   Cache()
+## instead, extract poly centroids - faster with terra
+hexcentroids <- centroids(hexgrd) |>
+  Cache(.cacheExtra = summary(hexgrd),
+        userTags = "hexcentroids", omitArgs = c("x", "userTags"))
+for (i in 1:3) gc(reset = TRUE)
+
+## Note: maybe not necessary, we want bgcs for center points of each hex
+# bgcs_hexgrd <- st_join(bgcs_hexgrd, regions)
+
+hexgrdDT <- terra::extract(bgcs, hexcentroids) |>
+  Cache(.cacheExtra = list(summary(bgcs), summary(hexcentroids)),
+        userTags = "hexgrdDT", omitArgs = c("x", "y", "userTags"))
+
 grd2 <- as.data.table(st_drop_geometry(bgcs_hexgrd))
 grd2 <- na.omit(grd2)
-setnames(grd2, c("siteno","zone","bgcs","dist_code"))
-dbWriteTable(con,"siteidx",grd2, row.names = F)
-dbExecute(con,"create index on siteidx(bgcs)")
-dbExecute(con,"create index on siteidx(dist_code,bgcs)")
-#bgcs <- bgcs[is.na(bgcs$State),c("bgcs")]
+
+## not necessary: we're caching and using data from climr
+# setnames(grd2, c("siteno","zone","bgcs","dist_code"))
+# dbWriteTable(con,"siteidx",grd2, row.names = F)
+# dbExecute(con,"create index on siteidx(bgcs)")
+# dbExecute(con,"create index on siteidx(dist_code,bgcs)")
 
 ##This is what I used to create the new hex grid
+
+## TODO: change to 250 dem, extract(..., method = "bilinear")
+
 dem <- raster("./BigDat/BC_25m_DEM_WGS84.tif")
 BC <- st_read(dsn = "./BigDat/BC_Province_Outline_Clean4.gpkg")
 BC <- ms_simplify(BC, keep = 0.1,sys = T)
@@ -39,6 +73,7 @@ mapview(BC)
 st_write(BC,dsn = "BC_Simplified.gpkg")
 st_is_valid(BC)
 
+## 4 km grid used for pairwise variable selection for BGC modelling exploration steps - not currently scripted? 
 BC <- st_read("./BigDat/TempBC2.gpkg")##very simple outline
 st_crs(BC) <- 3005
 bgcs_hexgrd <- st_make_grid(BC,cellsize = 4000, square = F, flat_topped = F) ##make grid
@@ -46,7 +81,7 @@ st_write(bgcs_hexgrd, dsn = "Grid4km.gpkg")
 bgcs_hexgrd <- st_as_sf(data.frame(ID = 1:length(bgcs_hexgrd),geom = bgcs_hexgrd))
 bgcs_hexgrd <- st_join(bgcs_hexgrd,BC)
 bgcs_hexgrd <- bgcs_hexgrd[!is.na(bgcs_hexgrd$State),]
-st_write(bgcs_hexgrd, dsn = "Grid4km.gpkg", delete_dsn = T)
+st_write(bgcs_hexgrd, dsn = "Grid4km.gpkg", delete_dsn = T)  
 pts_all <- st_centroid(bgcs_hexgrd)
 pts_all <- pts_all["ID"]
 pts_all$ID <- seq(1:nrow(pts_all))
