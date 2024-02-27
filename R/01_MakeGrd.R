@@ -16,7 +16,8 @@ bgcs <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Work
                                  projectTo = st_crs(4326)) |> 
   Cache()
 
-bgcs_hexgrd <- st_join(hexgrd, bgcs)
+bgcs_hexgrd <- st_join(hexgrd, bgcs) |>
+  Cache()
 
 regions <- st_read("~/CommonTables/ForestRegions.gpkg","ForestDistricts2")
 regions <- regions["ORG_UNIT"]
