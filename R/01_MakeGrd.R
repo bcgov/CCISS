@@ -6,7 +6,9 @@
 ## create siteno, bgcs, dist_code table for preselected by BEC
 hexgrd <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/HexGrid400m_Sept2021.gpkg",
                                    targetFile = "HexGrid400m_Sept2021.gpkg",
-                                   fun = "sf::st_read")
+                                   fun = "sf::st_read",
+                                   projectTo = st_crs(4326)) |>
+  Cache()
 
 bgcs <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
                                  targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
