@@ -35,7 +35,7 @@ makePointCoords <- function(bgc_poly, elev, gridSize = 2000, crs = "EPSG:4326") 
   bgc_grid <- st_make_grid(bgc_poly, cellsize = gridSize, what = "centers") |>
     st_transform(crs = st_crs(crs))
   bgc_grid2 <- vect(bgc_grid)
-  tmp_elev <- terra::extract(elev, bgc_grid2)
+  tmp_elev <- terra::extract(elev, bgc_grid2, method = "bilinear")
   
   coords <- geom(bgc_grid2, df = TRUE)
   
