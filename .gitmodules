@@ -1,15 +1,15 @@
 [submodule "modules/Build_USA_BEC"]
 	path = modules/Build_USA_BEC
-	url = git@github.com:whmacken/Build_USA_BEC.git
+	url = git@github.com:bcgov/Build_USA_BEC.git
 [submodule "modules/Build_WNA_BGC_model"]
 	path = modules/Build_WNA_BGC_model
-	url = git@github.com:FLNRO-Smithers-Research/Build_WNA_BGC_model.git
+	url = git@github.com:bcgov/Build_WNA_BGC_model.git
 [submodule "modules/BC_HexGrid"]
 	path = modules/BC_HexGrid
-	url = git@github.com:kdaust/BC_HexGrid.git
+	url = git@github.com:bcgov/BC_HexGrid.git
 [submodule "modules/CCISS_Reporter"]
 	path = modules/CCISS_Reporter
-	url = git@github.com:whmacken/CCISS_Reporter.git
+	url = git@github.com:bcgov/CCISS_Reporter.git
 [submodule "modules/CCISS_Portfolio_Dataset_Alignment"]
 	path = modules/CCISS_Portfolio_Dataset_Alignment
-	url = git@github.com:whmacken/CCISS_Portfolio_Dataset_Alignment.git
+	url = git@github.com:bcgov/CCISS_Portfolio_Dataset_Alignment.git
