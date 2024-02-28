@@ -37,17 +37,6 @@ coords_train <- coords_train[!is.na(elev),]
 
 setnames(coords_train, c("lon", "lat", "elev", "id"))
 
-## this is no longer necessary with automated spatial CV
-## make subsets of the study area for hold-outs (gaps)
-# studyarea <- ext(c(-123, -117, 49, 52.5))
-# gapextents <- makeGapExtents(studyarea, 5L)
-# ## convert to poly
-# gap_poly <- lapply(gapextents, vect, crs = "EPSG:4326")
-# gap_poly <- do.call(rbind, gap_poly)
-# 
-# coords_gaps <- subsetByExtent(coords_train, gap_poly)
-# coords_trainWgaps <- coords_train[!coords_gaps, on = "id"]
-
 vars_needed <- c("DD5", "DD_0_at", "DD_0_wt", "PPT05", "PPT06", "PPT07", "PPT08",
                  "PPT09", "CMD", "PPT_at", "PPT_wt", "CMD07", "SHM", "AHM", "NFFD", "PAS", "CMI")
 
