@@ -27,9 +27,13 @@ elev <- Cache(prepInputs,
               userTags = "elev", 
               omitArgs = c("userTags"))
 
-coords <- makePointCoords(bgcs, elev) |>
-  Cache()
-coords <- coords[!is.na(elev),]
+coords_train <- Cache(makePointCoords,
+                bgc_poly = bgcs,
+                elev = elev,
+                .cacheExtra = list(summary(bgcs), summary(elev)),
+                userTags = "coords",
+                omitArgs = c("userTags", "bgc_poly", "elev"))
+coords_train <- coords_train[!is.na(elev),]
 
 ## full training area
 trainingarea <- ext(c(-125, -112, 43, 55))
