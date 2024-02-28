@@ -8,7 +8,7 @@
 ## filepath(options(reproducible.destinationPath), "northamerica/northamerica_elevation_cec_2023.tif")
 ## then select 'y' when asked if objects are in the right place.
 
-## TODO: MakeGrd. is getting bgcs and dem, but only at bc scale. get them again.
+## TODO: for targets we need to use the API
 bgcs <- Cache(prepInputs,
               url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
               targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
@@ -26,7 +26,7 @@ elev <- Cache(prepInputs,
               targetFile = "northamerica/northamerica_elevation_cec_2023.tif",
               userTags = "elev", 
               omitArgs = c("userTags"))
-
+              
 coords_train <- Cache(makePointCoords,
                 bgc_poly = bgcs,
                 elev = elev,
@@ -157,3 +157,4 @@ RF_cv_prob$prediction()$score(msrs(c("classif.acc", "classif.ce"),
 ## confusion matrix
 RF_cv_prob$prediction()$confusion
 
+## TODO: save/export models and evaluation metrics
