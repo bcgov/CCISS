@@ -13,9 +13,10 @@ bgcs <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Work
                                  targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
                                  fun = "sf::st_read")
 
-elev <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif",
-                                 targetFile = "northamerica/northamerica_elevation_cec_2023.tif")
-
+# elev <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif",
+#                                  targetFile = "northamerica/northamerica_elevation_cec_2023.tif")
+elev <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_30m_WNA/WNA_DEM_SRT_30m_cropped.tif",
+                                 targetFile = "DEM_30m_WNA/WNA_DEM_SRT_30m_cropped.tif")
 coords <- makePointCoords(bgcs, elev) |>
   Cache()
 coords <- coords[!is.na(elev),]
