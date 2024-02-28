@@ -9,12 +9,18 @@
 ## then select 'y' when asked if objects are in the right place.
 
 ## TODO: MakeGrd. is getting bgcs and dem, but only at bc scale. get them again.
-bgcs <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
-                                 targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
-                                 fun = "sf::st_read")
+bgcs <- Cache(prepInputs,
+              url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
+              targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
+              fun = "sf::st_read",
+              userTags = "bgcs", 
+              omitArgs = c("userTags"))
 
-elev <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif",
-                                 targetFile = "northamerica/northamerica_elevation_cec_2023.tif")
+elev <- Cache(prepInputs,
+              url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif",
+              targetFile = "northamerica/northamerica_elevation_cec_2023.tif",
+              userTags = "elev", 
+              omitArgs = c("userTags"))
 
 coords <- makePointCoords(bgcs, elev) |>
   Cache()
