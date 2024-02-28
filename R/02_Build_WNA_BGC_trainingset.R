@@ -100,20 +100,35 @@ st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
 tsk_bgc <- as_task_classif_st(coords_train_balanced, target = "BGC")
 
 ## choose model type and eval metric
-lrn_rf <- lrn("classif.ranger", predict_type = "response",
-              num.trees = 501,
-              splitrule =  "extratrees",
-              mtry = 4,
-              min.node.size = 2,
-              importance = "permutation",
-              write.forest = TRUE)
+lrn_rf_resp <- lrn("classif.ranger", 
+                   predict_type = "response",
+                   num.trees = 501,
+                   splitrule =  "extratrees",
+                   mtry = 4,
+                   min.node.size = 2,
+                   importance = "permutation",
+                   write.forest = TRUE)
+
+## we'll also fit a probability type model for current/normal period predictions
+lrn_rf_prob <- lrn("classif.ranger", 
+                   predict_type = "probability",
+                   num.trees = 501,
+                   splitrule =  "extratrees",
+                   mtry = 4,
+                   min.node.size = 2,
+                   importance = "permutation",
+                   write.forest = TRUE)
+
 measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
 
-## fit full model --------------------------------------------
-lrn_rf$train(tsk_bgc)
-lrn_rf$model
+## fit full models --------------------------------------------
+lrn_rf_resp$train(tsk_bgc)
+lrn_rf_resp$model
+
+lrn_rf_prob$train(tsk_bgc)
+lrn_rf_prob$model
 ## this plot is useless, but code is kept here for fut reference
-# autoplot(lrn_rf$predict(tsk_bgc)) +
+# autoplot(lrn_rf_resp$predict(tsk_bgc)) +
 #   theme(legend.position = "none")
 
 ## evaluate model with CV ------------------------------------
@@ -123,14 +138,22 @@ cv_strategy <- rsmp("repeated_spcv_coords", folds = folds, repeats = 1)
 
 future::plan("multisession", 
              workers = ifelse(folds <= future::availableCores(), folds, future::availableCores()))
-RF_cv <- mlr3::resample(tsk_bgc, lrn_rf, cv_strategy, store_models = TRUE) |>
+RF_cv_resp <- mlr3::resample(tsk_bgc, lrn_rf_resp, cv_strategy, store_models = TRUE) |>
   Cache()
 future:::ClusterRegistry("stop")
 
-RF_cv$score(measure_acc)  ## eval of each fold
-RF_cv$aggregate(measure_acc)  ## aggregated scores
-RF_cv$prediction()$score(msrs(c("classif.acc", "classif.ce"),
+future::plan("multisession", 
+             workers = ifelse(folds <= future::availableCores(), folds, future::availableCores()))
+RF_cv_prob <- mlr3::resample(tsk_bgc, lrn_rf_prob, cv_strategy, store_models = TRUE) |>
+  Cache()
+future:::ClusterRegistry("stop")
+
+## eval metrics
+## TODO: find a pretty way to export these
+RF_cv_prob$score(measure_acc)  ## eval of each fold
+RF_cv_prob$aggregate(measure_acc)  ## aggregated scores
+RF_cv_prob$prediction()$score(msrs(c("classif.acc", "classif.ce"),
                               average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then compute the measure on this directly
 ## confusion matrix
-RF_cv$prediction()$confusion
+RF_cv_prob$prediction()$confusion
 
