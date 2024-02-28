@@ -33,6 +33,14 @@ regions <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/CommonT
   Cache(userTags = "regions", omitArgs = c("quick", "userTags"))
 regions <- regions["ORG_UNIT"]
 
+elev <- reproducible::prepInputs(url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif",
+                                 targetFile = "northamerica/northamerica_elevation_cec_2023.tif",
+                                 fun = "terra::vect",
+                                 to = hexgrd, 
+                                 maskTo = NA,
+                                 quick = TRUE) |> 
+  Cache(userTags = "elev", omitArgs = c("quick", "userTags"))
+
 for (i in 1:3) gc(reset = TRUE)  ## reset memory a few times
 
 ## Note: maybe not necessary, we want bgcs for center points of each hex
@@ -40,7 +48,7 @@ for (i in 1:3) gc(reset = TRUE)  ## reset memory a few times
 # bgcs_hexgrd <- st_join(hexgrd, bgcs) |>
 #   Cache()
 ## instead, extract poly centroids - faster with terra
-hexcentroids <- centroids(hexgrd) |>
+hexcentroids <- centroids(x = hexgrd) |>
   Cache(.cacheExtra = summary(hexgrd),
         userTags = "hexcentroids", omitArgs = c("x", "userTags"))
 for (i in 1:3) gc(reset = TRUE)
@@ -48,11 +56,12 @@ for (i in 1:3) gc(reset = TRUE)
 ## Note: maybe not necessary, we want bgcs for center points of each hex
 # bgcs_hexgrd <- st_join(bgcs_hexgrd, regions)
 
-hexgrdDT <- terra::extract(bgcs, hexcentroids) |>
+hexgrdDT <- terra::intersect(x = bgcs, y = hexcentroids) |>
   Cache(.cacheExtra = list(summary(bgcs), summary(hexcentroids)),
         userTags = "hexgrdDT", omitArgs = c("x", "y", "userTags"))
+## HERE
 
-grd2 <- as.data.table(st_drop_geometry(bgcs_hexgrd))
+grd2 <- as.data.table(hexgrdDT[1:10,])
 grd2 <- na.omit(grd2)
 
 ## not necessary: we're caching and using data from climr
@@ -65,7 +74,7 @@ grd2 <- na.omit(grd2)
 
 ## TODO: change to 250 dem, extract(..., method = "bilinear")
 
-dem <- raster("./BigDat/BC_25m_DEM_WGS84.tif")
+# dem <- raster("./BigDat/BC_25m_DEM_WGS84.tif") ## not used
 BC <- st_read(dsn = "./BigDat/BC_Province_Outline_Clean4.gpkg")
 BC <- ms_simplify(BC, keep = 0.1,sys = T)
 library(mapview)
@@ -113,6 +122,7 @@ con <- dbConnect(drv, user = "postgres",
 pgWriteRast(con,name = "bc_raster", raster = bcRast, overwrite = T)
 st_write(rast_pointsBC,con,"rast_centroids")
 
+## TODO: replace steps below with climr
 dbExecute(con,"create table pts2km_ids as
           select rast_centroids.rast_id,
           hex_grid.siteno
