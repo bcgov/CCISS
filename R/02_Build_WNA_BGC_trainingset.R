@@ -40,10 +40,17 @@ setnames(coords_train, c("lon", "lat", "elev", "id"))
 vars_needed <- c("DD5", "DD_0_at", "DD_0_wt", "PPT05", "PPT06", "PPT07", "PPT08",
                  "PPT09", "CMD", "PPT_at", "PPT_wt", "CMD07", "SHM", "AHM", "NFFD", "PAS", "CMI")
 
-clim_vars <- getClimate(coords_train, bgcs,
-                        which_normal = "normal_composite", return_normal = TRUE, 
-                        vars = vars_needed, cache = TRUE) |>
-  Cache()
+clim_vars <- Cache(
+  getClimate,
+  coords = coords_train, 
+  bgcs = bgcs,
+  which_normal = "normal_composite", 
+  return_normal = TRUE, 
+  vars = vars_needed, 
+  cache = TRUE,
+  .cacheExtra = list(summary(bgcs), summary(coords_train)),
+  userTags = "clim_vars",
+  omitArgs = c("userTags", "coords", "bgcs"))
 
 ## subset coords objects to ids with data
 coords_train <- coords_train[clim_vars[, .(id)], on = "id", nomatch = 0L]
