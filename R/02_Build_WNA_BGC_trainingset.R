@@ -47,7 +47,6 @@ clim_vars <- getClimate(coords_train, bgcs,
 
 ## subset coords objects to ids with data
 coords_train <- coords_train[clim_vars[, .(id)], on = "id", nomatch = 0L]
-# coords_trainWgaps <- coords_trainWgaps[clim_vars[, .(id)], on = "id", nomatch = 0L]
 
 setDT(clim_vars)   ## this shouldn't be necessary, submit issue/reprex to reproducible.
 addVars(clim_vars)
