@@ -15,6 +15,11 @@ bgcs <- Cache(prepInputs,
               fun = "sf::st_read",
               userTags = "bgcs", 
               omitArgs = c("userTags"))
+bgcs <- Cache(st_make_valid,
+              x = bgcs,
+              .cacheExtra = summary(bgcs),
+              userTags = "bgcs_valid",
+              omitArgs = c("userTags", "x"))
 
 elev <- Cache(prepInputs,
               url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif",
