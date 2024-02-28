@@ -35,9 +35,6 @@ coords_train <- Cache(makePointCoords,
                 omitArgs = c("userTags", "bgc_poly", "elev"))
 coords_train <- coords_train[!is.na(elev),]
 
-## full training area
-trainingarea <- ext(c(-125, -112, 43, 55))
-coords_train <- subsetByExtent(coords, trainingarea)
 setnames(coords_train, c("lon", "lat", "elev", "id"))
 
 ## this is no longer necessary with automated spatial CV
