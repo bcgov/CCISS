@@ -12,3 +12,6 @@ packages/
 
 ## data
 data/
+
+## AWS info
+Example_S3Buckets1.R
