@@ -63,25 +63,24 @@ vs_final <- c("DD5", "DD_delayed", "PPT_MJ", "PPT_JAS",
 
 trainData <- clim_vars[, .SD, .SDcols = c("BGC", "id", vs_final)]
 trainData <- trainData[complete.cases(trainData)]
-
-# BGC_counts <- trainData[, .(Num = .N), by = .(BGC)]   ## for inspection
-
-
-## clean trainind dataset - remove bad BGCs, outliers and BGCs with low sample sizes.
-badbgcs <- c("BWBSvk", "ICHmc1a", "MHun", "SBSun", "ESSFun", "SWBvk", "MSdm3",
-             "ESSFdc3", "IDFdxx_WY", "MSabS", "FGff", "JPWmk_WY" ) #, "ESSFab""CWHws2", "CWHwm", "CWHms1" , 
+  
+  # BGC_counts <- trainData[, .(Num = .N), by = .(BGC)]   ## for inspection
+  
+  ## TODO: open an issue to re-evaluate BGC exclusion
+  ## clean trainind dataset - remove bad BGCs, outliers and BGCs with low sample sizes.
+  badbgcs <- c("BWBSvk", "ICHmc1a", "MHun", "SBSun", "ESSFun", "SWBvk", "MSdm3",
+               "ESSFdc3", "IDFdxx_WY", "MSabS", "FGff", "JPWmk_WY" ) #, "ESSFab""CWHws2", "CWHwm", "CWHms1" , 
 trainData <- trainData[!BGC %in% badbgcs,]
 
 trainData <- removeOutlier(as.data.frame(trainData), alpha = .025, vars = vs_final) |>
   Cache()
 
-trainData <- rmLowSampleBGCs(trainData) |>
-  Cache()
-
-
-## subsampling
-dataBalance_recipe <- recipe(BGC ~ ., data =  trainData) |>
-  step_downsample(BGC, under_ratio = 90) |>  ## subsamples "oversampled" BGCs
+  trainData <- rmLowSampleBGCs(trainData) |>
+    Cache()
+  
+  ## subsampling
+  dataBalance_recipe <- recipe(BGC ~ ., data =  trainData) |>
+    step_downsample(BGC, under_ratio = 90) |>  ## subsamples "oversampled" BGCs
   prep()
 
 ## extract data.table
@@ -93,14 +92,13 @@ trainData_balanced <- dataBalance_recipe |>
 
 trainData_balanced[, BGC := as.factor(BGC)]
 
-## FIT MODEL WITH FULL DATA SET OR CROSS-VALIDATION
-cols <- c("BGC", vs_final)
-
-# trainData_balanced2 <- trainData_balanced[coords_trainWgaps, on = "id", nomatch = 0L]   ## better to evaluate with CV (below)
-
-coords_train_balanced <- coords_train[trainData_balanced, on = "id"]
-coords_train_balanced <- st_as_sf(coords_train_balanced, coords = c("lon", "lat"))
-st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
+  ## FIT MODEL WITH FULL DATA SET OR CROSS-VALIDATION
+  cols <- c("BGC", vs_final)
+  
+  ## convert to sf for spatial cv below
+  coords_train_balanced <- coords_train[trainData_balanced, on = "id"]
+  coords_train_balanced <- st_as_sf(coords_train_balanced, coords = c("lon", "lat"))
+  st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
 
 ## make a modelling task
 tsk_bgc <- as_task_classif_st(coords_train_balanced, target = "BGC")
@@ -125,16 +123,20 @@ lrn_rf_resp <- lrn("classif.ranger",
                    importance = "permutation",
                    write.forest = TRUE)
 
-measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
-
-## fit full models --------------------------------------------
-lrn_rf_resp$train(tsk_bgc)
-lrn_rf_resp$model
-
-lrn_rf_prob$train(tsk_bgc)
-lrn_rf_prob$model
-## this plot is useless, but code is kept here for fut reference
-# autoplot(lrn_rf_resp$predict(tsk_bgc)) +
+  measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
+  
+  ## fit full models --------------------------------------------
+  system.time({
+    lrn_rf_resp$train(tsk_bgc)
+  })
+  lrn_rf_resp$model
+  
+  system.time({
+    lrn_rf_prob$train(tsk_bgc)
+  })
+  lrn_rf_prob$model
+  ## this plot is useless, but code is kept here for fut reference
+  # autoplot(lrn_rf_resp$predict(tsk_bgc)) +
 #   theme(legend.position = "none")
 
 ## evaluate model with CV ------------------------------------
