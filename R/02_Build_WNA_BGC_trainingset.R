@@ -2,30 +2,30 @@
 
 ## FIT AND EVALUATE A BGC MODEL
 
-## TODO: need proper documentation and references to sources/scripts that produced these objects
-## for now, download files manually from object storage and put them in:
-## filepath(options(reproducible.destinationPath), "WNA_BGC_v12_5Apr2022.gpkg")
-## filepath(options(reproducible.destinationPath), "northamerica/northamerica_elevation_cec_2023.tif")
-## then select 'y' when asked if objects are in the right place.
+## TODO: need proper documentation and references to sources/scripts that produced input objects
 
-## TODO: for targets we need to use the API
-bgcs <- Cache(prepInputs,
-              url = "//objectstore2.nrs.bcgov/ffec/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022.gpkg",
-              targetFile = "WNA_BGC_v12_5Apr2022.gpkg",
-              fun = "sf::st_read",
-              userTags = "bgcs", 
-              omitArgs = c("userTags"))
-bgcs <- Cache(st_make_valid,
-              x = bgcs,
-              .cacheExtra = summary(bgcs),
-              userTags = "bgcs_valid",
-              omitArgs = c("userTags", "x"))
+dPath <- unlist(options("reproducible.destinationPath"))
 
-elev <- Cache(prepInputs,
-              url = "//objectstore2.nrs.bcgov/ffec/DEM/DEM_NorAm/NA_Elevation/data/northamerica/northamerica_elevation_cec_2023.tif",
-              targetFile = "northamerica/northamerica_elevation_cec_2023.tif",
+dwnldFromObjSto(prefix = "~/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022",
+                bucket = "gmrtde",
+                path = dPath)
+bgcs <- vect(file.path(dPath, "WNA_BGC_v12_5Apr2022.gpkg"))  ## for poly validation if need be
+
+
+dwnldFromObjSto(prefix = "~/DEM/DEM_NorAm/NA_Elevation/data/northamerica",
+                bucket = "gmrtde",
+                path = dPath)
+elev <- rast(file.path(dPath, "northamerica_elevation_cec_2023.tif"))
+
+cacheExtra <- list(summary(elev), table(bgcs$BGC))
+elev <- Cache(postProcessTerra,
+              from = elev,
+              cropTo = bgcs,
+              projectTo = bgcs,
+              maskTo = NA,
+              .cacheExtra = cacheExtra,
               userTags = "elev", 
-              omitArgs = c("userTags"))
+              omitArgs = c("from", "userTags", "cropTo", "projectTo", "maskTo"))
               
 coords_train <- Cache(makePointCoords,
                 bgc_poly = bgcs,

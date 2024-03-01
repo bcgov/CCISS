@@ -28,6 +28,37 @@ dists <- dists["ORG_UNIT"]
 dists$ORG_UNIT <- as.character(dists$ORG_UNIT)
 dists$ORG_UNIT[dists$ORG_UNIT == "DSS"] <- "CAS"
 colnames(dists)[1] <- "dist_code"
+## Load hex grid from where we'll extract the centroids
+## get hexgrid from object storage
+dPath <- unlist(options("reproducible.destinationPath"))
+## get file from object storage and save locally. then use prepInputs for the rest
+dwnldFromObjSto(prefix = "~/CCISS_Working/WNA_BGC/HexGrid400m_Sept2021.gpkg",
+                bucket = "gmrtde",
+                path = dPath)
+hexgrd <- vect(file.path(dPath, "HexGrid400m_Sept2021.gpkg"))
+hexgrd <- Cache(postProcessTerra,
+                from = hexgrd
+                cropTo = NA,
+                maskTo = NA,
+                projectTo = rast(crs = "EPSG:4326"),
+                userTags = "hexgrd", 
+                omitArgs = c("from", "userTags"))
+
+
+dwnldFromObjSto(prefix = "~/DEM/DEM_NorAm/NA_Elevation/data/northamerica",
+                bucket = "gmrtde",
+                path = dPath)
+elev <- rast(file.path(dPath, "northamerica_elevation_cec_2023.tif"))
+cacheExtra <- list(summary(elev), table(hexcentroids)) ### HERE CHECK THAT TABLE WORKS
+elev <- Cache(postProcessTerra,
+              from = elev,
+              cropTo = hexcentroids,
+              projectTo = hexcentroids,
+              maskTo = NA,
+              .cacheExtra = cacheExtra,
+              userTags = "elev", 
+              omitArgs = c("from", "userTags", "cropTo", "projectTo", "maskTo"))
+
 
 ## step get climate data from climr
 

@@ -30,7 +30,7 @@ Require::Require(c(
 
 ## install, but don't load these.
 Require::Require(c(
-  "future"), 
+  "aws.s3",
   require = FALSE)
 
 options(reproducible.cachePath = normalizePath("reproducible.cache/", winslash = "/"),
