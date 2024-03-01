@@ -18,10 +18,10 @@
 #' @importFrom sf st_make_grid st_transform
 #' @importFrom data.table setDT
 makePointCoords <- function(bgc_poly, elev, gridSize = 2000, crs = "EPSG:4326") {
-  if (!inherits(bgc_poly, "sf")) {
-    bgc_poly <- tryCatch(st_as_sf(bgc_poly), error = function(e) e)
-    if (is(bgc_poly, "error")) {
-      stop("Can't coherce bgc_poly to an sf object. Please pass an sf object or another cohercible object class.")
+  if (!is(bgc_poly, "SpatVector")) {
+    bgc_poly <- try(vect(bgc_poly), error = function(e) e)
+    if (is(bgc_poly, "simple-error")) {
+      stop("Can't coherce bgc_poly to SpatVector. Please pass a SpatVector or another cohercible object class.")
     }
   }
   
@@ -32,19 +32,18 @@ makePointCoords <- function(bgc_poly, elev, gridSize = 2000, crs = "EPSG:4326") 
     }
   }
   
-  bgc_grid <- st_make_grid(bgc_poly, cellsize = gridSize, what = "centers") |>
-    st_transform(crs = st_crs(crs))
-  bgc_grid2 <- vect(bgc_grid)
-  tmp_elev <- terra::extract(elev, bgc_grid2, method = "bilinear")
+  ## faster than using sf::st_make_grid
+  # tmp_elev <- 
+  bgc_grid <- rast(res = gridSize, extent = ext(bgc_poly), crs = crs(bgc_poly, proj = TRUE))
+  bgc_grid[] <- 1L
+  bgc_grid <- as.data.table(bgc_grid, xy = TRUE) |>
+    vect(geom = c("x", "y"), crs = crs(bgc_grid, proj = TRUE)) ## faster than extracting with DT
   
-  coords <- geom(bgc_grid2, df = TRUE)
-  
-  setDT(coords)
-  coords[, c("part","hole","geom") := NULL]
-  coords[, elev := tmp_elev[,2]]
-  coords[, id := seq_along(elev)]
-  
-  return(coords)
+  coords_elev <- terra::extract(elev, bgc_grid, method = "bilinear", xy = TRUE) |> 
+    as.data.table()  ## faster than terra::geom
+  setnames(coords_elev, c("id", "elev", "lon", "lat"))
+
+  return(coords_elev)
 }
 
 

@@ -34,8 +34,7 @@ coords_train <- Cache(makePointCoords,
                 userTags = "coords",
                 omitArgs = c("userTags", "bgc_poly", "elev"))
 coords_train <- coords_train[!is.na(elev),]
-
-setnames(coords_train, c("lon", "lat", "elev", "id"))
+coords_train[, id := seq_along(id)]  ## re-do to have contiguous IDs
 
 vars_needed <- c("DD5", "DD_0_at", "DD_0_wt", "PPT05", "PPT06", "PPT07", "PPT08",
                  "PPT09", "CMD", "PPT_at", "PPT_wt", "CMD07", "SHM", "AHM", "NFFD", "PAS", "CMI")
