@@ -30,7 +30,7 @@ elev <- Cache(postProcessTerra,
 coords_train <- Cache(makePointCoords,
                 bgc_poly = bgcs,
                 elev = elev,
-                .cacheExtra = list(summary(bgcs), summary(elev)),
+                      .cacheExtra = cacheExtra,
                 userTags = "coords",
                 omitArgs = c("userTags", "bgc_poly", "elev"))
 coords_train <- coords_train[!is.na(elev),]
