@@ -10,7 +10,7 @@ dwnldFromObjSto(prefix = "~/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022",
                 bucket = "gmrtde",
                 path = dPath)
 bgcs <- vect(file.path(dPath, "WNA_BGC_v12_5Apr2022.gpkg"))  ## for poly validation if need be
-
+.gc()
 
 dwnldFromObjSto(prefix = "~/DEM/DEM_NorAm/NA_Elevation/data/northamerica",
                 bucket = "gmrtde",
@@ -26,6 +26,7 @@ elev <- Cache(postProcessTerra,
               .cacheExtra = cacheExtra,
               userTags = "elev", 
               omitArgs = c("from", "userTags", "cropTo", "projectTo", "maskTo"))
+.gc()
               
 coords_train <- Cache(makePointCoords,
                 bgc_poly = bgcs,

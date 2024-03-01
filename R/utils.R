@@ -373,3 +373,17 @@ dwnldFromObjSto <- function(prefix, bucket, path) {
     stop("Please install 'aws.s3' package to use this function")
   }
 }
+
+#' Garbage collect a few times
+#' 
+#' Sometimes running `gc(reset = TRUE)` once doesn't
+#' release all unused memory.
+#'
+#' @param times integer. Number of times to repeat `gc(reset = TRUE)`
+#'
+#' @return NULL
+#' 
+#' @export
+.gc <- function(times = 3L) {
+  for(i in 1:times) invisible({gc(reset = TRUE)})
+}
