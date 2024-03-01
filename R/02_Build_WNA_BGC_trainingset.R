@@ -114,13 +114,13 @@ lrn_rf_resp <- lrn("classif.ranger",
                    min.node.size = 2,
                    importance = "permutation",
                    write.forest = TRUE)
-
-## we'll also fit a probability type model for current/normal period predictions
-lrn_rf_prob <- lrn("classif.ranger", 
-                   predict_type = "probability",
-                   num.trees = 501,
-                   splitrule =  "extratrees",
-                   mtry = 4,
+  
+  ## we'll also fit a probability type model for current/normal period predictions
+  lrn_rf_prob <- lrn("classif.ranger", 
+                     predict_type = "prob",
+                     num.trees = 501,
+                     splitrule =  "extratrees",
+                     mtry = 4,
                    min.node.size = 2,
                    importance = "permutation",
                    write.forest = TRUE)
