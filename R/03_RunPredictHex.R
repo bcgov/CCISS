@@ -1,26 +1,16 @@
-##read in climateBC files, predict, and send to db
-##Kiri Daust, Dec 2020
+## read in climateBC files, predict, and send to db
+## Kiri Daust, Dec 2020
 
-require(data.table)
-require(randomForest)
-require(ranger)
-require(foreach)
-require(dplyr)
-require(reshape2)
-library(doParallel)
-library(tidyr)
-require(sf)
-require(RPostgreSQL)
-library(disk.frame)
-require(RPostgres)
+## This script makes all predictions to the grid of hex centroids (from 400m hex grid)
+## and uploads them to the server
 
-## after updating future predictions on DB:
-## make preselected points dataset - 200 randomly selected points per BGC and district (comme from forest regions)
+## MOVE THIS TO A SEPARATE SCRIPT ----
+## it also makes a preselected points dataset - 
+## i.e. 200 randomly selected points per BGC and district (comme from forest regions)
+## this set of points is use much later by a scrip that needs to still be constructed by Kiri.
 # 1. get hexgrid 400m
 # 2. get the centroids
 # 3. sample 200 centroids per BGCxDistrict combo
-
-## todo: LOAD HEX GRID
 
 st_layers("~/CommonTables/ForestRegions.gpkg")
 dists <- st_read("~/CommonTables/ForestRegions.gpkg","ForestDistricts2")
@@ -28,6 +18,8 @@ dists <- dists["ORG_UNIT"]
 dists$ORG_UNIT <- as.character(dists$ORG_UNIT)
 dists$ORG_UNIT[dists$ORG_UNIT == "DSS"] <- "CAS"
 colnames(dists)[1] <- "dist_code"
+## ----
+
 ## Load hex grid from where we'll extract the centroids
 ## get hexgrid from object storage
 dPath <- unlist(options("reproducible.destinationPath"))
