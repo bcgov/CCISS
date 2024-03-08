@@ -89,7 +89,7 @@ subsetByExtent <- function(coords, cropExt = ext(c(-123, -118, 49, 52)), crs = "
       }
     }
   }
-
+  
   coords_out <- crop(coords_poly, cropExt)
   
   if (!nrow(coords_out)) {
@@ -129,7 +129,7 @@ makeGapExtents <- function(studyarea = ext(c(-123, -118, 49, 52)), ngaps = 5L) {
     gap <- ext(c(centre[1]+sort(gapcentre[i,1]*c(1,3)/8)*range[1], centre[2]+sort(gapcentre[i,2]*c(1,3)/8)*range[2]))
     gap
   })
-
+  
   return(append(gapextents, extragaps))
 }
 
@@ -148,33 +148,88 @@ makeGapExtents <- function(studyarea = ext(c(-123, -118, 49, 52)), ngaps = 5L) {
 #'  
 #' @importFrom sf st_as_sf  st_join
 #' @importFrom data.table data.table
-getClimate <- function(coords, bgcs, crs = "EPSG:4326", ...) {
+# getClimate <- function(coords, bgcs, crs = "EPSG:4326", ...) {
+#   dots <- list(...)
+#   
+#   if (any(!c("lon", "lat", "elev", "id") %in% names(coords))) {
+#     stop("coords must contain columns 'lon', 'lat', 'elev' and 'id'")
+#   }
+#   
+#   coords_sf <- st_as_sf(coords, coords = c("lon", "lat"), crs = crs)
+#   coords_sf$elev <- NULL
+#   coords_sf <- st_transform(coords_sf, 3005)
+#   
+#   coords_bgc <- st_join(coords_sf, bgcs) |>
+#     Cache()
+#   coords_bgc <- data.table(coords_bgc[,c("id", "BGC")])
+#   coords_bgc[, geometry := NULL]
+#   coords_bgc <- coords_bgc[!is.na(BGC),]
+#   
+#   coords <- as.data.frame(coords)
+#   
+#   args <- append(list(coords = coords, coords_bgc = coords_bgc), dots)
+#   out <- do.call(.getClimVars, args)
+#   
+#   return(out)
+# }
+
+#' Prepares coordinates and obtains climate normals
+#'  using `climr_downscale`
+#'
+#' @param coords a `data.table`, or spatial points (`SpatVector` or `sf`) 
+#'   with point coordinates ("lon" = longitude, "lat" = latitude), elevation ("elev") and point IDs ("id").
+#' @param crs character. Projection used in `coords`.
+#'   If different from "EPSG:4326", `coords` and `bgcs` will be reprojected to 
+#'   "EPSG:4326". If `coords` is a spatial points object, `crs` will be 
+#'   `crs(coords, proj = TRUE)`.
+#' @param ... further arguments passed to [climr_downscale()].
+#' 
+#' @details
+#' If `bgcs` is provided, the BGC field will be appended to
+#' the output `data.table`.
+#' 
+#' @seealso [climr_downscale()]
+#'
+#' @return climate normals as a `data.table`
+#' @export
+#'  
+#' @importFrom terra intersect
+#' @importFrom data.table data.table
+getClimate <- function(coords, crs = NULL, ...) {
   dots <- list(...)
   
-  if (any(!c("lon", "lat", "elev", "id") %in% names(coords))) {
-    stop("coords must contain columns 'lon', 'lat', 'elev' and 'id'")
+  if (!is(coords, "data.table")) {
+    coords <- if (is(coords, "SpatVector")) {
+      try(as.data.table(coords, geom = "XY"))
+    } else if (inherits(coords, "sf")) {
+      try({
+        cbind(st_drop_geometry(coords), st_coordinates(coords)) |>
+          as.data.table()
+      })
+    } 
+    
+    if (is(coords, "simple-error")) {
+      stop("coords is not coercible to 'data.table'. Provide coercible object class",
+           " or a 'data.table'")
+    }
+    browser()  ## keep all columns, but rename the ones created in the conversion above
+    setnames(coords, old = c("ID", "x", "y"), c("id", "lon", "lat"))
   }
   
-  coords_sf <- st_as_sf(coords, coords = c("lon", "lat"), crs = crs)
-  coords_sf$elev <- NULL
-  coords_sf <- st_transform(coords_sf, 3005)
-  
-  coords_bgc <- st_join(coords_sf, bgcs) |>
-    Cache()
-  coords_bgc <- data.table(coords_bgc[,c("id", "BGC")])
-  coords_bgc[, geometry := NULL]
-  coords_bgc <- coords_bgc[!is.na(BGC),]
-  
-  coords <- as.data.frame(coords)
-  
-  args <- append(list(coords = coords, coords_bgc = coords_bgc), dots)
-  out <- do.call(.getClimVars, args)
+  climrCols <- c("lon", "lat", "elev", "id")
+  if (any(!climrCols %in% names(coords))) {
+    stop("coords must contain columns 'lon', 'lat', 'elev' and 'id'")
+  }
 
+  args <- append(list(coords = coords), dots)
+  out <- do.call(.getClimVars, args)
+  
   return(out)
 }
 
 
-#' Wrapper for `climr_downscale`
+#' Wrapper for `climr_downscale` that keeps extra columns in
+#' table of point coordinates.
 #'
 #' @inheritParams getClimate 
 #'
@@ -182,14 +237,18 @@ getClimate <- function(coords, bgcs, crs = "EPSG:4326", ...) {
 #' 
 #' @importFrom climr climr_downscale
 #' @importFrom data.table setDT
-.getClimVars <- function(coords, coords_bgc, ...) {
+.getClimVars <- function(coords, ...) {
   clim_vars <- climr_downscale(coords, ...) |>
-    Cache()
-  setDT(clim_vars)
+  Cache()
+  ##test: 
+  # clim_vars <- climr_downscale(coords[1003050:1003085,], ...)
   clim_vars <- clim_vars[!is.nan(PPT05),] ##lots of points in the ocean
-  clim_vars[coords_bgc, BGC := i.BGC, on = "id"]
-  clim_vars <- clim_vars[!is.na(BGC), ]
   clim_vars[, PERIOD := NULL]
+  
+  setDT(clim_vars)
+  
+  ## join all columns back
+  clim_vars <- coords[clim_vars, on = "id"]
   
   return(clim_vars)
 }
@@ -342,6 +401,7 @@ vertDist <- function(x) {
 sideLen <- function(x) {
   x/sqrt(3)
 }
+
 
 
 #' Download a file from Object Storage

@@ -2,8 +2,6 @@
 
 ## FIT AND EVALUATE A BGC MODEL
 
-## TODO: need proper documentation and references to sources/scripts that produced input objects
-
 dPath <- unlist(options("reproducible.destinationPath"))
 
 dwnldFromObjSto(prefix = "~/CCISS_Working/WNA_BGC/WNA_BGC_v12_5Apr2022",
@@ -27,28 +25,47 @@ elev <- Cache(postProcessTerra,
               userTags = "elev", 
               omitArgs = c("from", "userTags", "cropTo", "projectTo", "maskTo"))
 .gc()
-              
+
 coords_train <- Cache(makePointCoords,
-                bgc_poly = bgcs,
-                elev = elev,
+                      bgc_poly = bgcs,
+                      elev = elev,
                       .cacheExtra = cacheExtra,
-                userTags = "coords",
-                omitArgs = c("userTags", "bgc_poly", "elev"))
+                      userTags = "coords",
+                      omitArgs = c("userTags", "bgc_poly", "elev"))
 coords_train <- coords_train[!is.na(elev),]
-coords_train[, id := seq_along(id)]  ## re-do to have contiguous IDs
 
 vars_needed <- c("DD5", "DD_0_at", "DD_0_wt", "PPT05", "PPT06", "PPT07", "PPT08",
                  "PPT09", "CMD", "PPT_at", "PPT_wt", "CMD07", "SHM", "AHM", "NFFD", "PAS", "CMI")
+## add BGCs
+coords_train <- Cache(terra::intersect,  ## much faster than extract.
+                      x = vect(coords_train, geom = c("lon", "lat"), crs = crs(bgcs)), 
+                      y = bgcs,
+                      .cacheExtra = list(summary(coords_train), cacheExtra[[2]]),
+                      userTags = "coords_bgc",
+                      omitArgs = c("userTags", "x", "y"))
+
+## project to climr-compatible projection "EPSG:4326"
+coords_train <- Cache(project,
+                      x = coords_train, 
+                      y = crs("EPSG:4326", proj = TRUE),
+                      .cacheExtra = summary(coords_train),
+                      userTags = "coords_proj",
+                      omitArgs = c("userTags", "x"))
+
+## back to DT
+coords_train <- as.data.table(coords_train, geom = "XY") |>
+  setnames(old = c("x", "y"), new = c("lon", "lat"))
+coords_train[, id := seq_along(id)]  ## re-do to have contiguous IDs
 
 clim_vars <- Cache(
   getClimate,
   coords = coords_train, 
-  bgcs = bgcs,
   which_normal = "normal_composite", 
   return_normal = TRUE, 
   vars = vars_needed, 
+  crs = crs(bgcs, proj = TRUE),
   cache = TRUE,
-  .cacheExtra = list(summary(bgcs), summary(coords_train)),
+  .cacheExtra = list(cacheExtra[[2]], summary(coords_train)),
   userTags = "clim_vars",
   omitArgs = c("userTags", "coords", "bgcs"))
 
@@ -63,24 +80,23 @@ vs_final <- c("DD5", "DD_delayed", "PPT_MJ", "PPT_JAS",
 
 trainData <- clim_vars[, .SD, .SDcols = c("BGC", "id", vs_final)]
 trainData <- trainData[complete.cases(trainData)]
-  
-  # BGC_counts <- trainData[, .(Num = .N), by = .(BGC)]   ## for inspection
-  
-  ## TODO: open an issue to re-evaluate BGC exclusion
-  ## clean trainind dataset - remove bad BGCs, outliers and BGCs with low sample sizes.
-  badbgcs <- c("BWBSvk", "ICHmc1a", "MHun", "SBSun", "ESSFun", "SWBvk", "MSdm3",
-               "ESSFdc3", "IDFdxx_WY", "MSabS", "FGff", "JPWmk_WY" ) #, "ESSFab""CWHws2", "CWHwm", "CWHms1" , 
+
+# BGC_counts <- trainData[, .(Num = .N), by = .(BGC)]   ## for inspection
+
+## clean trainind dataset - remove bad BGCs, outliers and BGCs with low sample sizes.
+badbgcs <- c("BWBSvk", "ICHmc1a", "MHun", "SBSun", "ESSFun", "SWBvk", "MSdm3",
+             "ESSFdc3", "IDFdxx_WY", "MSabS", "FGff", "JPWmk_WY" ) #, "ESSFab""CWHws2", "CWHwm", "CWHms1" , 
 trainData <- trainData[!BGC %in% badbgcs,]
 
 trainData <- removeOutlier(as.data.frame(trainData), alpha = .025, vars = vs_final) |>
   Cache()
 
-  trainData <- rmLowSampleBGCs(trainData) |>
-    Cache()
-  
-  ## subsampling
-  dataBalance_recipe <- recipe(BGC ~ ., data =  trainData) |>
-    step_downsample(BGC, under_ratio = 90) |>  ## subsamples "oversampled" BGCs
+trainData <- rmLowSampleBGCs(trainData) |>
+  Cache()
+
+## subsampling
+dataBalance_recipe <- recipe(BGC ~ ., data =  trainData) |>
+  step_downsample(BGC, under_ratio = 90) |>  ## subsamples "oversampled" BGCs
   prep()
 
 ## extract data.table
@@ -92,15 +108,16 @@ trainData_balanced <- dataBalance_recipe |>
 
 trainData_balanced[, BGC := as.factor(BGC)]
 
-  ## FIT MODEL WITH FULL DATA SET OR CROSS-VALIDATION
-  cols <- c("BGC", vs_final)
-  
-  ## convert to sf for spatial cv below
-  coords_train_balanced <- coords_train[trainData_balanced, on = "id"]
-  coords_train_balanced <- st_as_sf(coords_train_balanced, coords = c("lon", "lat"))
-  st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
+## FIT MODEL WITH FULL DATA SET OR CROSS-VALIDATION
+cols <- c("BGC", vs_final)
+
+## convert to sf for spatial cv below
+coords_train_balanced <- coords_train[, .(id, lon, lat)][trainData_balanced, on = "id"]
+coords_train_balanced <- sf::st_as_sf(coords_train_balanced, coords = c("lon", "lat"))
+sf::st_crs(coords_train_balanced) <- crs(elev, proj = TRUE)
 
 ## make a modelling task
+coords_train_balanced$BGC <- as.factor(coords_train_balanced$BGC)
 tsk_bgc <- as_task_classif_st(coords_train_balanced, target = "BGC")
 
 ## choose model type and eval metric
@@ -112,31 +129,34 @@ lrn_rf_resp <- lrn("classif.ranger",
                    min.node.size = 2,
                    importance = "permutation",
                    write.forest = TRUE)
-  
-  ## we'll also fit a probability type model for current/normal period predictions
-  lrn_rf_prob <- lrn("classif.ranger", 
-                     predict_type = "prob",
-                     num.trees = 501,
-                     splitrule =  "extratrees",
-                     mtry = 4,
+
+## we'll also fit a probability type model for current/normal period predictions
+lrn_rf_prob <- lrn("classif.ranger", 
+                   predict_type = "prob",
+                   num.trees = 501,
+                   splitrule =  "extratrees",
+                   mtry = 4,
                    min.node.size = 2,
                    importance = "permutation",
                    write.forest = TRUE)
 
-  measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
-  
-  ## fit full models --------------------------------------------
-  system.time({
-    lrn_rf_resp$train(tsk_bgc)
-  })
-  lrn_rf_resp$model
-  
-  system.time({
-    lrn_rf_prob$train(tsk_bgc)
-  })
-  lrn_rf_prob$model
-  ## this plot is useless, but code is kept here for fut reference
-  # autoplot(lrn_rf_resp$predict(tsk_bgc)) +
+measure_acc <- msrs(c("classif.acc", "classif.ce", "oob_error"))
+
+## fit full models --------------------------------------------
+system.time({
+  lrn_rf_resp$train(tsk_bgc)
+})
+lrn_rf_resp$model
+.gc()
+
+## running out of mem for this one??
+system.time({
+  lrn_rf_prob$train(tsk_bgc)
+})
+lrn_rf_prob$model
+.gc()
+## this plot is useless, but code is kept here for fut reference
+# autoplot(lrn_rf_resp$predict(tsk_bgc)) +
 #   theme(legend.position = "none")
 
 ## evaluate model with CV ------------------------------------
@@ -161,7 +181,7 @@ future:::ClusterRegistry("stop")
 RF_cv_prob$score(measure_acc)  ## eval of each fold
 RF_cv_prob$aggregate(measure_acc)  ## aggregated scores
 RF_cv_prob$prediction()$score(msrs(c("classif.acc", "classif.ce"),
-                              average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then compute the measure on this directly
+                                   average = "micro"))  ## pool predictions across resampling iterations into one Prediction object and then compute the measure on this directly
 ## confusion matrix
 RF_cv_prob$prediction()$confusion
 

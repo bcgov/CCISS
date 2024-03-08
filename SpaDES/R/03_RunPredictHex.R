@@ -36,6 +36,12 @@ hexgrd <- Cache(postProcessTerra,
                 userTags = "hexgrd", 
                 omitArgs = c("from", "userTags"))
 
+## get centroids
+hexcentroids <- Cache(centroids,
+                      x = hexgrd,
+                      .cacheExtra = summary(hexgrd),
+                      userTags = "hexcentroids", 
+                      omitArgs = c("x", "userTags"))
 
 dwnldFromObjSto(prefix = "~/DEM/DEM_NorAm/NA_Elevation/data/northamerica",
                 bucket = "gmrtde",
@@ -52,8 +58,29 @@ elev <- Cache(postProcessTerra,
               omitArgs = c("from", "userTags", "cropTo", "projectTo", "maskTo"))
 
 
-## step get climate data from climr
+## INTERSECT FASTER?
+hexcoords <- Cache(terra::extract,
+                   x = elev, 
+                   y = hexcentroids, 
+                   method = "bilinear",
+                   cells = TRUE,
+                   xy =  TRUE,
+                   .cacheExtra = list(summary(hexcentroids), summary(elev)),
+                   userTags = "hexcoords",
+                   omitArgs = c("userTags", "x", "y"))
 
+## step get climate data from climr
+gcms <- list_gcm()
+runs <- 3 ## exclude ensembleMean later and note that not all GCMs have 3 runs
+ssps <- list_ssp()
+periods <- list_gcm_period()
+
+getClimate2(hexcentroids,
+            which_normal = "normal_composite",
+            gcm_models = gcms,
+            ssp = ssps, 
+            gcm_period = periods, 
+            runs = runs)
 # do in R
 # drv <- dbDriver("PostgreSQL")
 # con <- dbConnect(drv, user = "postgres", host = "138.197.168.220",password = "PowerOfBEC", port = 5432, dbname = "cciss") ### for local use
